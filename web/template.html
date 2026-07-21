@@ -261,18 +261,30 @@
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
   }
+
+
+  .toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: inherit; font-size: 12.5px; color: var(--muted);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 11px 4px 9px; cursor: pointer;
+  }
+  .toggle[aria-pressed="true"] { color: var(--ink); border-color: var(--muted); }
+  .toggle svg { opacity: .45; }
+  .toggle[aria-pressed="true"] svg { opacity: 1; color: var(--accent); }
+  .panel code { font-size: 11.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">Apartment List · Jan 2017 – present</div>
+    <div class="eyebrow">Apartment List · Census ACS · Zillow</div>
     <h1>Vacancy and rent, in the same place</h1>
     <p>
-      Vacancy rates and rents get published separately, so the two are rarely read against each
-      other. Pick up to four markets to see how much slack each one carries and what rents did
-      about it.
+      Vacancy rates and rents get published separately, so the two are rarely read against
+      each other. Three sources are stacked here on one time axis: asking rents that move
+      fast, survey rents that go back to 2005, and home values that go back to 1996.
     </p>
   </header>
 
@@ -312,15 +324,42 @@
   <section class="tiles" id="tiles" aria-label="Latest figures"></section>
 
   <section class="card panel">
-    <h2>Median asking rent</h2>
-    <p class="sub" id="rentsub">New leases, all unit sizes. Drag to zoom, double-click to reset.</p>
+    <div class="panelhead">
+      <div>
+        <h2>Rent</h2>
+        <p class="sub" id="rentsub"></p>
+      </div>
+      <div class="panelctl" id="rentSources" role="group" aria-label="Rent sources"></div>
+    </div>
     <div id="rentPlot" class="plot"></div>
   </section>
 
   <section class="card panel">
-    <h2>Vacancy index</h2>
-    <p class="sub">Share of units sitting empty. Same time axis as the rent chart above.</p>
+    <h2>Vacancy</h2>
+    <p class="sub">
+      Apartment List counts empty units among properties listing on its platform; the ACS
+      rate is <code>vacant-for-rent ÷ (renter-occupied + vacant-for-rent)</code>. The levels
+      are not comparable — the movement is.
+    </p>
     <div id="vacPlot" class="plot"></div>
+  </section>
+
+  <section class="card panel">
+    <div class="panelhead">
+      <div>
+        <h2 id="zTitle">Home values</h2>
+        <p class="sub" id="zsub"></p>
+      </div>
+      <div class="panelctl">
+        <label class="sr" for="zmeasure">Measure</label>
+        <select id="zmeasure">
+          <option value="zhvi">Typical home value (ZHVI)</option>
+          <option value="ratio">Years of rent to buy</option>
+          <option value="zordi">Renter demand (ZORDI)</option>
+        </select>
+      </div>
+    </div>
+    <div id="zPlot" class="plot"></div>
   </section>
 
   <section class="card panel">
@@ -330,6 +369,11 @@
         <p class="sub" id="xsub"></p>
       </div>
       <div class="panelctl">
+        <label class="sr" for="xsource">Source</label>
+        <select id="xsource">
+          <option value="al">Apartment List, monthly</option>
+          <option value="acs">ACS, annual to 2005</option>
+        </select>
         <label class="sr" for="xgeo">Geography</label>
         <select id="xgeo">
           <option value="Metro">Metros</option>
@@ -348,16 +392,32 @@
   </section>
 
   <section class="card panel">
-    <h2>Does slack move rent?</h2>
-    <p class="sub" id="scattersub"></p>
+    <div class="panelhead">
+      <div>
+        <h2>Does slack move rent?</h2>
+        <p class="sub" id="scattersub"></p>
+      </div>
+      <div class="panelctl">
+        <label class="sr" for="ssource">Source</label>
+        <select id="ssource">
+          <option value="al">Apartment List, monthly</option>
+          <option value="acs">ACS, annual</option>
+        </select>
+      </div>
+    </div>
     <div id="scatterPlot" class="plot"></div>
   </section>
 
   <footer>
-    Data: <a href="https://www.apartmentlist.com/research/category/data-rent-estimates">Apartment
-    List rent estimates and vacancy index</a>, monthly since January 2017, rebuilt by
-    <code>uv run build-data</code>. The vacancy index counts vacant units among properties listing
-    on Apartment List, so its level runs above Census estimates; the movement is what to read.
+    Sources:
+    <a href="https://www.apartmentlist.com/research/category/data-rent-estimates">Apartment List</a>
+    rent estimates and vacancy index, monthly from 2017 ·
+    <a href="https://www.census.gov/programs-surveys/acs">Census ACS</a> 1-year tables,
+    annual from 2005 (no 2020 release) ·
+    <a href="https://www.zillow.com/research/data/">Zillow</a> ZORI from 2015, ZHVI from 1996,
+    ZORDI from 2020. Rebuilt by <code>uv run build-data</code>.
+    Asking rents (Apartment List, ZORI) price new leases; ACS gross rent covers sitting
+    tenants and includes utilities, so it sits lower and moves later.
   </footer>
 </div>
 
@@ -366,18 +426,36 @@
   const MAX = 4;
   const SERIES = ["--s1", "--s2", "--s3", "--s4"];
 
-  const months = DATA.months;
-  const dates = months.map(m => m.slice(0, 4) + "-" + m.slice(5) + "-01");
   const geos = DATA.geos;
   geos.forEach((g, i) => { g.i = i; });
+
+  // one date axis per source
+  const AX = {
+    al: DATA.al_months.map(m => m.slice(0, 4) + "-" + m.slice(5) + "-01"),
+    acs: DATA.acs_years.map(y => y + "-07-01"),
+    zori: DATA.z_months.zori,
+    zhvi: DATA.z_months.zhvi,
+    zordi: DATA.z_months.zordi,
+  };
+
+  // rent series a market can carry, in draw order
+  const RENT = [
+    { id: "al", label: "Apartment List asking", dash: "solid", axis: "al" },
+    { id: "zori", label: "Zillow ZORI", dash: "dash", axis: "zori" },
+    { id: "acs", label: "ACS gross rent", dash: "dot", axis: "acs" },
+  ];
 
   const state = {
     picked: [geos.findIndex(g => g.t === "National")].filter(i => i >= 0),
     bed: "overall",
     lag: 6,
+    rentSources: new Set(["al", "zori", "acs"]),
+    zmeasure: "zhvi",
+    xsource: "al",
     xgeo: "Metro",
     xmeasure: "level",
     xframe: null,
+    ssource: "al",
   };
   if (!state.picked.length) state.picked = [0];
 
@@ -387,18 +465,49 @@
   const signed = (v, d = 1) => (v > 0 ? "+" : "") + v.toFixed(d);
   const label = g => g.n + (g.t === "City" || g.t === "County" ? ", " + (g.s || "") : "");
 
-  /* ── series maths ───────────────────────────────────── */
-  const rentSeries = g => (g.r[state.bed] || g.r.overall).map(v => v == null ? null : v);
-  const vacSeries = g => g.v.map(v => v == null ? null : v / 100);
+  /* ── series accessors ───────────────────────────────── */
+  // every accessor returns a plain array aligned to AX[axis], or null
 
-  function yoySeries(g) {
-    const r = rentSeries(g);
-    return r.map((v, i) => (i < 12 || v == null || r[i - 12] == null) ? null : (v / r[i - 12] - 1) * 100);
+  function rentOf(g, source) {
+    if (source === "al") return g.al ? (g.al.r[state.bed] || g.al.r.overall) : null;
+    if (source === "acs") {
+      if (!g.acs) return null;
+      const r = g.acs.r[state.bed];
+      // ACS only has bedroom detail from 2015; fall back where it is missing
+      return (r && r.some(v => v != null)) ? r : g.acs.r.overall;
+    }
+    if (source === "zori") return g.z ? g.z.zori : null;
+    return null;
+  }
+
+  function vacOf(g, source) {
+    const src = source === "acs" ? g.acs : g.al;
+    return src ? src.v.map(v => v == null ? null : v / 100) : null;
+  }
+
+  function yoyOf(g, source) {
+    const r = rentOf(g, source);
+    if (!r) return null;
+    const step = source === "acs" ? 1 : 12;   // annual vs monthly
+    return r.map((v, i) => (i < step || v == null || r[i - step] == null)
+      ? null : (v / r[i - step] - 1) * 100);
+  }
+
+  const lagStep = () => state.ssource === "acs" ? Math.round(state.lag / 12) : state.lag;
+
+  function lagPairs(g, source) {
+    const v = vacOf(g, source), y = yoyOf(g, source);
+    if (!v || !y) return [];
+    const ax = AX[source === "acs" ? "acs" : "al"], k = lagStep(), out = [];
+    for (let i = 0; i + k < v.length; i++) {
+      if (v[i] != null && y[i + k] != null) out.push([v[i], y[i + k], ax[i].slice(0, 7)]);
+    }
+    return out;
   }
 
   function pearson(pairs) {
     const n = pairs.length;
-    if (n < 8) return null;
+    if (n < 6) return null;
     let sx = 0, sy = 0;
     for (const [x, y] of pairs) { sx += x; sy += y; }
     const mx = sx / n, my = sy / n;
@@ -410,16 +519,8 @@
     return (sxx && syy) ? sxy / Math.sqrt(sxx * syy) : null;
   }
 
-  function lagPairs(g) {
-    const v = vacSeries(g), y = yoySeries(g), out = [];
-    for (let i = 0; i + state.lag < v.length; i++) {
-      const a = v[i], b = y[i + state.lag];
-      if (a != null && b != null) out.push([a, b, months[i]]);
-    }
-    return out;
-  }
-
   function lastDefined(arr) {
+    if (!arr) return { v: null, i: -1 };
     for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return { v: arr[i], i };
     return { v: null, i: -1 };
   }
@@ -436,13 +537,15 @@
     const out = [];
     for (const g of geos) {
       if (state.picked.includes(g.i)) continue;
-      const hay = label(g).toLowerCase();
-      const at = hay.indexOf(t);
+      const at = label(g).toLowerCase().indexOf(t);
       if (at >= 0) out.push([at === 0 ? 0 : 1, -g.p, g]);
-      if (out.length > 400) break;
     }
     out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     return out.slice(0, 40).map(x => x[2]);
+  }
+
+  function sourceTag(g) {
+    return [g.al && "AL", g.acs && "ACS", g.z && "Z"].filter(Boolean).join(" ");
   }
 
   function renderResults() {
@@ -454,7 +557,7 @@
       li.setAttribute("aria-selected", k === cursor);
       li.innerHTML = "<span></span><span class='kind'></span>";
       li.firstChild.textContent = label(g);
-      li.lastChild.textContent = g.t;
+      li.lastChild.textContent = g.t + " · " + sourceTag(g);
       li.addEventListener("mousedown", e => { e.preventDefault(); pick(g.i); });
       results.appendChild(li);
     });
@@ -509,19 +612,31 @@
     }
   });
 
-  document.getElementById("bed").addEventListener("change", e => {
-    state.bed = e.target.value;
-    document.getElementById("rentsub").textContent =
-      "New leases, " + e.target.selectedOptions[0].text.toLowerCase() +
-      ". Drag to zoom, double-click to reset.";
-    render();
+  /* ── rent source toggles ────────────────────────────── */
+  const rentSources = document.getElementById("rentSources");
+  RENT.forEach(s => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "toggle";
+    b.dataset.id = s.id;
+    b.setAttribute("aria-pressed", state.rentSources.has(s.id));
+    b.innerHTML = `<svg width="16" height="8" aria-hidden="true"><line x1="1" y1="4" x2="15" y2="4"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      ${s.dash === "dash" ? 'stroke-dasharray="5 3"' : s.dash === "dot" ? 'stroke-dasharray="1 3"' : ""}/></svg>
+      <span>${s.label}</span>`;
+    b.addEventListener("click", () => {
+      if (state.rentSources.has(s.id)) {
+        if (state.rentSources.size === 1) return;
+        state.rentSources.delete(s.id);
+      } else state.rentSources.add(s.id);
+      b.setAttribute("aria-pressed", state.rentSources.has(s.id));
+      renderPlots();
+    });
+    rentSources.appendChild(b);
   });
 
-  document.getElementById("xgeo").addEventListener("change", e => {
-    state.xgeo = e.target.value; renderCrossSection();
-  });
-  document.getElementById("xmeasure").addEventListener("change", e => {
-    state.xmeasure = e.target.value; renderCrossSection();
+  document.getElementById("bed").addEventListener("change", e => {
+    state.bed = e.target.value; render();
   });
 
   const lag = document.getElementById("lag");
@@ -531,25 +646,55 @@
     render();
   });
 
+  document.getElementById("zmeasure").addEventListener("change", e => {
+    state.zmeasure = e.target.value; renderZ();
+  });
+  document.getElementById("ssource").addEventListener("change", e => {
+    state.ssource = e.target.value; renderScatter();
+  });
+  document.getElementById("xsource").addEventListener("change", e => {
+    state.xsource = e.target.value; state.xframe = null; renderCrossSection();
+  });
+  document.getElementById("xgeo").addEventListener("change", e => {
+    state.xgeo = e.target.value; renderCrossSection();
+  });
+  document.getElementById("xmeasure").addEventListener("change", e => {
+    state.xmeasure = e.target.value; renderCrossSection();
+  });
+
   /* ── tiles ──────────────────────────────────────────── */
   function renderTiles() {
     const g = geos[state.picked[0]];
-    const r = rentSeries(g), v = vacSeries(g), y = yoySeries(g);
+    const hasAL = !!g.al;
+    const src = hasAL ? "al" : "acs";
+    const r = rentOf(g, src), v = vacOf(g, src), y = yoyOf(g, src);
     const lr = lastDefined(r), lv = lastDefined(v), ly = lastDefined(y);
-    const vYear = lv.i >= 12 ? v[lv.i - 12] : null;
-    const dv = (lv.v != null && vYear != null) ? lv.v - vYear : null;
-    const r_ = pearson(lagPairs(g).map(p => [p[0], p[1]]));
-    const asOf = lr.i >= 0 ? new Date(dates[lr.i]).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
+    const step = src === "acs" ? 1 : 12;
+    const vPrev = lv.i >= step ? v[lv.i - step] : null;
+    const dv = (lv.v != null && vPrev != null) ? lv.v - vPrev : null;
+    const rr = pearson(lagPairs(g, state.ssource).map(p => [p[0], p[1]]));
+    const ax = AX[src === "acs" ? "acs" : "al"];
+    const asOf = lr.i >= 0
+      ? new Date(ax[lr.i]).toLocaleDateString(undefined,
+          src === "acs" ? { year: "numeric" } : { month: "short", year: "numeric" })
+      : "";
+    const srcName = src === "acs" ? "ACS" : "Apartment List";
+
+    const zhvi = lastDefined(g.z ? g.z.zhvi : null);
+    const zori = lastDefined(g.z ? g.z.zori : null);
+    const ratio = (zhvi.v && zori.v) ? zhvi.v / (zori.v * 12) : null;
 
     const tiles = [
-      ["Median rent", fmtMoney(lr.v), label(g) + " · " + asOf, ""],
-      ["Rent, year over year", ly.v == null ? "—" : signed(ly.v) + "%", "vs. same month last year",
+      ["Rent", fmtMoney(lr.v), `${label(g)} · ${srcName} ${asOf}`, ""],
+      ["Rent, year on year", ly.v == null ? "—" : signed(ly.v) + "%", "same month a year earlier",
         ly.v == null ? "" : (ly.v >= 0 ? "pos" : "neg")],
-      ["Vacancy", fmtPct(lv.v), "share of units empty", ""],
-      ["Vacancy vs. last year", dv == null ? "—" : signed(dv) + " pts",
+      ["Vacancy", fmtPct(lv.v), srcName + " basis", ""],
+      ["Vacancy, year on year", dv == null ? "—" : signed(dv) + " pts",
         dv == null ? "" : (dv > 0 ? "more slack" : "tighter"), ""],
-      ["Correlation, " + state.lag + " mo lag", r_ == null ? "—" : r_.toFixed(2),
-        "vacancy vs. later rent growth", ""],
+      ["Years of rent to buy", ratio == null ? "—" : ratio.toFixed(1),
+        "home value ÷ annual rent", ""],
+      [`Correlation, ${lagStep()}${state.ssource === "acs" ? " yr" : " mo"} lag`,
+        rr == null ? "—" : rr.toFixed(2), "vacancy vs. later rent growth", ""],
     ];
 
     document.getElementById("tiles").innerHTML = tiles.map(([k, val, d, cls]) =>
@@ -557,7 +702,7 @@
       `<span class="v ${cls}">${val}</span><span class="d">${d}</span></div>`).join("");
   }
 
-  /* ── plots ──────────────────────────────────────────── */
+  /* ── plot scaffolding ───────────────────────────────── */
   function base(height, extra) {
     const font = { family: "system-ui, -apple-system, Segoe UI, sans-serif", size: 12, color: css("--ink-2") };
     return Object.assign({
@@ -565,13 +710,14 @@
       font,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
-      margin: { l: 62, r: 24, t: 8, b: 40 },
+      margin: { l: 68, r: 24, t: 12, b: 40 },
       hoverlabel: {
         bgcolor: css("--surface"), bordercolor: css("--line"),
         font: { color: css("--ink"), family: font.family, size: 12 },
       },
-      showlegend: state.picked.length > 1,
-      legend: { orientation: "h", y: 1.16, x: 0, font: { size: 12 } },
+      // no plot legend: the market chips carry colour->market and the source
+      // toggles carry line style->source, both directly above the charts
+      showlegend: false,
       xaxis: {
         gridcolor: css("--grid"), linecolor: css("--line"), zeroline: false,
         tickfont: { color: css("--muted"), size: 11 },
@@ -586,50 +732,137 @@
   const CONFIG = { responsive: true, displaylogo: false, scrollZoom: false,
     modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d", "toggleSpikelines"] };
 
-  function lineTraces(getter, hover) {
-    return state.picked.map((idx, k) => {
-      const g = geos[idx];
-      return {
-        type: "scatter", mode: "lines", name: label(g),
-        x: dates, y: getter(g),
-        line: { width: 2, color: css(SERIES[k]), shape: "linear" },
-        hovertemplate: hover,
-        connectgaps: false,
-      };
-    });
+  const DASH = { solid: "solid", dash: "6px,4px", dot: "2px,4px" };
+
+  function lineTrace(g, k, y, axis, opts) {
+    return Object.assign({
+      type: "scatter", mode: "lines",
+      x: AX[axis], y,
+      line: { width: 2, color: css(SERIES[k]), dash: DASH[opts.dash || "solid"] },
+      connectgaps: false,
+    }, opts.trace || {});
   }
 
+  /* ── rent & vacancy panels ──────────────────────────── */
   function renderPlots() {
-    Plotly.react("rentPlot", lineTraces(rentSeries, "%{y:$,.0f}<extra>%{fullData.name}</extra>"),
-      base(280, {
-        hovermode: "x unified",
-        yaxis: Object.assign(base(0).yaxis, { tickprefix: "$", separatethousands: true }),
-      }), CONFIG);
-
-    Plotly.react("vacPlot", lineTraces(vacSeries, "%{y:.2f}%<extra>%{fullData.name}</extra>"),
-      base(240, {
-        hovermode: "x unified",
-        yaxis: Object.assign(base(0).yaxis, { ticksuffix: "%" }),
-      }), CONFIG);
-
-    // scatter: vacancy(t) vs rent growth(t + lag)
-    const traces = [];
-    const rs = [];
+    const rentTraces = [];
     state.picked.forEach((idx, k) => {
-      const g = geos[idx], pairs = lagPairs(g), color = css(SERIES[k]);
-      if (!pairs.length) return;
+      const g = geos[idx];
+      RENT.forEach(s => {
+        if (!state.rentSources.has(s.id)) return;
+        const y = rentOf(g, s.id);
+        if (!y || !y.some(v => v != null)) return;
+        rentTraces.push(lineTrace(g, k, y, s.axis, {
+          dash: s.dash,
+          trace: {
+            name: label(g) + " · " + s.label,
+            hovertemplate: "%{y:$,.0f}<extra>%{fullData.name}</extra>",
+          },
+        }));
+      });
+    });
+
+    Plotly.react("rentPlot", rentTraces, base(300, {
+      hovermode: "x unified",
+      yaxis: Object.assign(base(0).yaxis, { tickprefix: "$", separatethousands: true }),
+    }), CONFIG);
+
+    document.getElementById("rentsub").textContent =
+      "Dollars per month. Line style marks the source; colour marks the market. " +
+      "Drag to zoom, double-click to reset.";
+
+    const vacTraces = [];
+    state.picked.forEach((idx, k) => {
+      const g = geos[idx];
+      [["al", "Apartment List", "solid"], ["acs", "ACS", "dot"]].forEach(([src, name, dash]) => {
+        const y = vacOf(g, src);
+        if (!y || !y.some(v => v != null)) return;
+        vacTraces.push(lineTrace(g, k, y, src, {
+          dash,
+          trace: {
+            name: label(g) + " · " + name,
+            hovertemplate: "%{y:.2f}%<extra>%{fullData.name}</extra>",
+          },
+        }));
+      });
+    });
+
+    Plotly.react("vacPlot", vacTraces, base(280, {
+      hovermode: "x unified",
+      yaxis: Object.assign(base(0).yaxis, { ticksuffix: "%" }),
+    }), CONFIG);
+
+    renderZ();
+    renderScatter();
+  }
+
+  /* ── Zillow panel ───────────────────────────────────── */
+  function renderZ() {
+    const m = state.zmeasure;
+    const traces = [];
+    state.picked.forEach((idx, k) => {
+      const g = geos[idx];
+      if (!g.z) return;
+      let y, axis;
+      if (m === "zhvi") { y = g.z.zhvi; axis = "zhvi"; }
+      else if (m === "zordi") { y = g.z.zordi; axis = "zordi"; }
+      else {
+        // years of rent to buy: home value over annual asking rent, on the ZORI axis
+        axis = "zori";
+        const zh = g.z.zhvi, zr = g.z.zori;
+        const off = AX.zhvi.indexOf(AX.zori[0]);
+        y = zr.map((r, i) => {
+          const h = off >= 0 ? zh[off + i] : null;
+          return (r && h) ? h / (r * 12) : null;
+        });
+      }
+      if (!y || !y.some(v => v != null)) return;
+      traces.push(lineTrace(g, k, y, axis, {
+        trace: {
+          name: label(g),
+          hovertemplate: (m === "zhvi" ? "%{y:$,.0f}" : m === "ratio" ? "%{y:.1f} years" : "%{y:.0f}") +
+            "<extra>%{fullData.name}</extra>",
+        },
+      }));
+    });
+
+    const yaxis = Object.assign(base(0).yaxis,
+      m === "zhvi" ? { tickprefix: "$", separatethousands: true } : {});
+
+    Plotly.react("zPlot", traces, base(280, {
+      hovermode: "x unified", yaxis,
+    }), CONFIG);
+
+    const titles = {
+      zhvi: ["Home values", "Typical home value, mid-tier, monthly back to February 1996. " +
+        "The longest series here by two decades."],
+      ratio: ["Years of rent to buy", "Home value divided by twelve months of asking rent. " +
+        "Higher means buying is expensive relative to renting."],
+      zordi: ["Renter demand", "Engagement with Zillow rental listings, indexed. Seasonal by " +
+        "nature — compare the same month across years, not month to month."],
+    };
+    document.getElementById("zTitle").textContent = titles[m][0];
+    document.getElementById("zsub").textContent = titles[m][1] +
+      (traces.length ? "" : " No Zillow coverage for the selected markets.");
+  }
+
+  /* ── lagged scatter ─────────────────────────────────── */
+  function renderScatter() {
+    const src = state.ssource;
+    const traces = [], rs = [];
+    state.picked.forEach((idx, k) => {
+      const g = geos[idx], pairs = lagPairs(g, src), color = css(SERIES[k]);
+      if (pairs.length < 4) return;
       traces.push({
         type: "scatter", mode: "markers", name: label(g),
         x: pairs.map(p => p[0]), y: pairs.map(p => p[1]),
         customdata: pairs.map(p => p[2].replace("_", "-")),
         marker: { size: 7, color, opacity: 0.62, line: { width: 1, color: css("--surface") } },
-        hovertemplate: "%{customdata}: %{x:.2f}% vacant → %{y:+.1f}% rent" +
-          "<extra>%{fullData.name}</extra>",
+        hovertemplate: "%{customdata}: %{x:.2f}% vacant → %{y:+.1f}% rent<extra>%{fullData.name}</extra>",
       });
-      const r_ = pearson(pairs.map(p => [p[0], p[1]]));
-      if (r_ != null) rs.push(label(g) + " r = " + r_.toFixed(2));
+      const r = pearson(pairs.map(p => [p[0], p[1]]));
+      if (r != null) rs.push(label(g) + " r = " + r.toFixed(2));
 
-      // least-squares fit
       const n = pairs.length;
       const mx = pairs.reduce((s, p) => s + p[0], 0) / n;
       const my = pairs.reduce((s, p) => s + p[1], 0) / n;
@@ -641,42 +874,53 @@
         traces.push({
           type: "scatter", mode: "lines", showlegend: false, hoverinfo: "skip",
           x: xs, y: xs.map(x => a + b * x),
-          line: { width: 2, color, dash: "dot" },
+          line: { width: 2, color, dash: "2px,4px" },
         });
       }
     });
 
+    const unit = src === "acs" ? "years" : "months";
     Plotly.react("scatterPlot", traces, base(360, {
       hovermode: "closest",
+      margin: { l: 68, r: 24, t: 8, b: 52 },
       xaxis: Object.assign(base(0).xaxis, { title: { text: "Vacancy rate", standoff: 8 }, ticksuffix: "%" }),
       yaxis: Object.assign(base(0).yaxis, {
-        title: { text: "Rent growth " + state.lag + " months later", standoff: 8 },
+        title: { text: `Rent growth ${lagStep()} ${unit} later`, standoff: 8 },
         ticksuffix: "%", zeroline: true, zerolinecolor: css("--line"), zerolinewidth: 1,
       }),
-      margin: { l: 68, r: 24, t: 8, b: 52 },
     }), CONFIG);
 
     document.getElementById("scattersub").textContent =
-      "Each dot is one month. A downward slope means slack came before slower rent growth. " +
-      (rs.length ? rs.join(" · ") : "");
+      `Each dot is one ${src === "acs" ? "year" : "month"}. A downward slope means slack came ` +
+      "before slower rent growth. " + rs.join(" · ");
   }
 
-  /* ── cross-section: every market, animated by year ──── */
-  const monthName = i => new Date(dates[i]).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  /* ── cross-section: every market, animated ──────────── */
+  function xsAxis() { return state.xsource === "acs" ? "acs" : "al"; }
+
+  function periodName(i) {
+    const d = AX[xsAxis()][i];
+    return state.xsource === "acs" ? d.slice(0, 4)
+      : new Date(d).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  }
 
   function snapshotIndices() {
+    const n = AX[xsAxis()].length;
+    if (state.xsource === "acs") return Array.from({ length: n - 1 }, (_, i) => i + 1);
     const out = [];
-    for (let i = months.length - 1; i >= 12; i -= 12) out.push(i);
+    for (let i = n - 1; i >= 12; i -= 12) out.push(i);
     return out.reverse();
   }
 
   function snapshot(i) {
-    const pts = [];
+    const src = state.xsource, pts = [];
     for (const g of geos) {
       if (g.t !== state.xgeo) continue;
-      const r = rentSeries(g), v = vacSeries(g);
+      const r = rentOf(g, src), v = vacOf(g, src);
+      if (!r || !v) continue;
+      const step = src === "acs" ? 1 : 12;
       const y = state.xmeasure === "yoy"
-        ? (r[i] != null && r[i - 12] != null ? (r[i] / r[i - 12] - 1) * 100 : null)
+        ? (i >= step && r[i] != null && r[i - step] != null ? (r[i] / r[i - step] - 1) * 100 : null)
         : r[i];
       if (v[i] == null || y == null) continue;
       pts.push({ g, x: v[i], y });
@@ -692,11 +936,11 @@
     const colorOf = g => css(SERIES[state.picked.indexOf(g.i)] || "--s1");
     const suffix = state.xmeasure === "yoy" ? "%{y:+.1f}% rent" : "%{y:$,.0f}";
     const hover = "<b>%{customdata}</b><br>%{x:.2f}% vacant · " + suffix + "<extra></extra>";
-    const size = p => Math.max(6, Math.min(30, 5 + Math.sqrt(p.g.p) / 260));
+    const size = p => p.g.p ? Math.max(6, Math.min(30, 5 + Math.sqrt(p.g.p) / 260)) : 7;
 
     return [
       {
-        type: "scatter", mode: "markers", name: state.xgeo + "s", showlegend: false,
+        type: "scatter", mode: "markers", showlegend: false,
         x: rest.map(p => p.x), y: rest.map(p => p.y),
         customdata: rest.map(p => label(p.g)),
         marker: {
@@ -706,7 +950,7 @@
         hovertemplate: hover,
       },
       {
-        type: "scatter", mode: "markers+text", name: "selected", showlegend: false,
+        type: "scatter", mode: "markers+text", showlegend: false,
         x: hits.map(p => p.x), y: hits.map(p => p.y),
         text: hits.map(p => p.g.n), textposition: "top center",
         textfont: { size: 11, color: css("--ink") },
@@ -722,15 +966,15 @@
 
   function xsAnnotations(i) {
     const pts = snapshot(i);
-    const r_ = pearson(pts.map(p => [p.x, p.y]));
+    const r = pearson(pts.map(p => [p.x, p.y]));
     return [
       {
-        text: monthName(i), x: 0.99, y: 0.04, xref: "paper", yref: "paper",
+        text: periodName(i), x: 0.99, y: 0.04, xref: "paper", yref: "paper",
         xanchor: "right", yanchor: "bottom", showarrow: false,
         font: { size: 34, color: css("--grid"), family: "ui-monospace, SFMono-Regular, monospace" },
       },
       {
-        text: pts.length + " " + state.xgeo.toLowerCase() + "s · r = " + (r_ == null ? "—" : r_.toFixed(2)),
+        text: pts.length + " " + state.xgeo.toLowerCase() + "s · r = " + (r == null ? "—" : r.toFixed(2)),
         x: 0.99, y: 0.005, xref: "paper", yref: "paper",
         xanchor: "right", yanchor: "bottom", showarrow: false,
         font: { size: 12, color: css("--muted") },
@@ -740,22 +984,34 @@
 
   function renderCrossSection() {
     const idx = snapshotIndices();
+    if (!idx.length) return;
     if (state.xframe == null || !idx.includes(state.xframe)) state.xframe = idx[idx.length - 1];
     const cur = state.xframe;
 
-    // one shared range across all frames so the animation reads as movement
-    let xhi = 0, ylo = Infinity, yhi = -Infinity;
-    for (const i of idx) {
-      for (const p of snapshot(i)) {
-        xhi = Math.max(xhi, p.x); ylo = Math.min(ylo, p.y); yhi = Math.max(yhi, p.y);
-      }
+    // pool every frame, then clip the axes to percentiles: a handful of rural
+    // markets run past 40% vacancy and would flatten everything else
+    const xs = [], ys = [];
+    for (const i of idx) for (const p of snapshot(i)) { xs.push(p.x); ys.push(p.y); }
+    const total = xs.length;
+    const pct = (arr, q) => {
+      if (!arr.length) return 0;
+      const a = [...arr].sort((m, n) => m - n);
+      return a[Math.min(a.length - 1, Math.floor(q * (a.length - 1)))];
+    };
+    const xhi = pct(xs, 0.99), ylo = pct(ys, 0.01), yhi = pct(ys, 0.99);
+    if (!total) {
+      Plotly.react("xsPlot", [], base(430, {}), CONFIG);
+      document.getElementById("xsub").textContent =
+        "No " + state.xgeo.toLowerCase() + " coverage in this source.";
+      return;
     }
-    const ypad = (yhi - ylo) * 0.08 || 1;
+    // extra headroom at the top so the labels on selected markets aren't clipped
+    const yspan = (yhi - ylo) || 1;
 
     const yaxis = Object.assign(base(0).yaxis, {
-      range: [ylo - ypad, yhi + ypad],
+      range: [ylo - yspan * 0.08, yhi + yspan * 0.16],
       title: {
-        text: state.xmeasure === "yoy" ? "Rent growth, year over year" : "Median rent",
+        text: state.xmeasure === "yoy" ? "Rent growth, year on year" : "Median rent",
         standoff: 8,
       },
     }, state.xmeasure === "yoy"
@@ -792,7 +1048,7 @@
         bgcolor: css("--line"),
         bordercolor: css("--line"),
         steps: idx.map(i => ({
-          label: months[i].slice(0, 4),
+          label: AX[xsAxis()][i].slice(0, 4),
           method: "animate",
           args: [["f" + i], { mode: "immediate", frame: { duration: 400, redraw: true }, transition: { duration: 300 } }],
         })),
@@ -806,7 +1062,9 @@
     }));
 
     const el = document.getElementById("xsPlot");
-    Plotly.react(el, xsTraces(cur), layout, CONFIG).then(() => {
+    // newPlot, not react: frames accumulate across react calls, and a stale frame
+    // named for one source would collide with the same index in the other
+    Plotly.newPlot(el, xsTraces(cur), layout, CONFIG).then(() => {
       el.on("plotly_animated", () => {
         const s = el.layout.sliders && el.layout.sliders[0];
         if (s) state.xframe = idx[s.active] ?? state.xframe;
@@ -816,7 +1074,7 @@
 
     document.getElementById("xsub").textContent =
       "One dot per market, sized by population. Press play to watch the whole country move, " +
-      "or drag the year slider. Selected markets stay labelled.";
+      "or drag the slider. Selected markets stay labelled.";
   }
 
   function render() { renderTiles(); renderPlots(); renderCrossSection(); }
@@ -824,7 +1082,6 @@
   renderChips();
   render();
 
-  // repaint on theme change (OS preference or the viewer's toggle)
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderChips(); render(); });
   new MutationObserver(() => { renderChips(); render(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });

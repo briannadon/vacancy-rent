@@ -121,8 +121,13 @@ def build() -> dict:
 
 def write_outputs(data: dict) -> None:
     WEB.mkdir(exist_ok=True)
-    payload = json.dumps(data, separators=(",", ":"))
-    (WEB / "data.json").write_text(payload)
+    (WEB / "data.json").write_text(json.dumps(data, separators=(",", ":")))
+
+    # the page reads the merged payload, not the Apartment List data alone
+    from .combine import combine
+
+    payload = json.dumps(combine(), separators=(",", ":"))
+    (WEB / "combined.json").write_text(payload)
 
     template = (WEB / "template.html").read_text()
     if "__DATA__" not in template:

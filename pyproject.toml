@@ -12,6 +12,8 @@ dependencies = [
 [project.scripts]
 build-data = "vacancy_rent.build_data:main"
 fetch-acs = "vacancy_rent.acs:main"
+fetch-zillow = "vacancy_rent.zillow:main"
+combine = "vacancy_rent.combine:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -62,6 +62,7 @@ BEDROOM_FIRST_YEAR = 2015
 YEARS = [y for y in range(2005, 2025) if y != 2020]
 
 LEVELS = {
+    "National": {"for": "us:*"},
     "Metro": {"for": "metropolitan statistical area/micropolitan statistical area:*"},
     "State": {"for": "state:*"},
     "County": {"for": "county:*", "in": "state:*"},
@@ -131,6 +132,8 @@ def num(v: str | None) -> float | None:
 def clean_name(name: str, level: str) -> tuple[str, str | None]:
     """Split 'Austin-Round Rock, TX Metro Area' into a name and a state."""
     name = name.replace(" Metro Area", "").replace(" Micro Area", "")
+    if level == "National":
+        return "United States", None
     if level in ("Metro", "County", "City") and "," in name:
         head, tail = name.rsplit(",", 1)
         return head.strip(), tail.strip()

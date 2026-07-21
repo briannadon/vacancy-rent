@@ -8,10 +8,27 @@ same geographies and the same monthly grid (Jan 2017 onward, national / state /
 metro / county / city) — but on separate pages, never joined. This joins them and
 puts a Plotly page on top.
 
+## Sources
+
+| | measure | frequency | from | coverage |
+|---|---|---|---|---|
+| Apartment List | asking rent on new leases, vacancy index | monthly | 2017 | 526 places |
+| Census ACS 1-year | gross rent, rental vacancy rate | annual | 2005 | 1,572 places |
+| Zillow ZORI | asking rent | monthly | 2015 | metros |
+| Zillow ZHVI | typical home value | monthly | 1996 | metros |
+| Zillow ZORDI | renter demand index | monthly | 2020 | metros |
+
+466 places carry both a monthly and an annual history. Each source names places
+differently, so `combine.py` joins them on a normalised key per geography level.
+
 ## What the page does
 
-- **Rent and vacancy over time** for up to four markets at once, one panel each so
-  neither measure is squeezed onto a second y-axis.
+- **Rent over time** from up to three sources at once, for up to four markets.
+  Colour marks the market, line style marks the source, so an asking rent and a
+  survey rent for the same place read as one market's two measures.
+- **Vacancy over time**, Apartment List against ACS, on its own panel — no second
+  y-axis anywhere.
+- **Home values, price-to-rent, and renter demand** from the Zillow indices.
 - **Unit size held fixed** — all units, 1br, or 2br. Not square footage, but it
   removes the biggest composition effect in a median asking rent.
 - **Every market at once**: one dot per market, sized by population, with a year
@@ -25,9 +42,14 @@ puts a Plotly page on top.
 ## Run it
 
 ```sh
-uv run build-data      # fetch the latest CSVs, join, write site/
+uv run fetch-acs       # Census ACS, needs CENSUS_API_KEY in .env
+uv run fetch-zillow    # ZORI, ZHVI, ZORDI
+uv run build-data      # Apartment List, then merge everything into site/
 xdg-open site/index.html
 ```
+
+`build-data` runs the merge itself, so after the first full pull only that last
+command is needed (add `--offline` to skip re-downloading Apartment List).
 
 `site/index.html` is self-contained apart from `plotly.min.js` sitting next to it,
 so it opens straight off the filesystem — no server, no network.
