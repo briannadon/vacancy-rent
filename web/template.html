@@ -487,7 +487,7 @@
   const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
   const fmtMoney = v => v == null ? "—" : "$" + Math.round(v).toLocaleString();
   const fmtPct = (v, d = 1) => v == null ? "—" : v.toFixed(d) + "%";
-  const signed = (v, d = 1) => (v > 0 ? "+" : "") + v.toFixed(d);
+  const signed = (v, d = 1) => v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(d);
   const label = g => g.n + (g.t === "City" || g.t === "County" ? ", " + (g.s || "") : "");
 
   /* ── series accessors ───────────────────────────────── */
@@ -904,9 +904,11 @@
       traces.push({
         type: "scatter", mode: "markers", name: label(g),
         x: pairs.map(p => p[0]), y: pairs.map(p => p[1]),
-        customdata: pairs.map(p => p[2].replace("_", "-")),
+        // Plotly's hovertemplate format parser rejects the d3 "+" sign flag and
+        // falls back to the raw float, so the signed number is built here
+        customdata: pairs.map(p => [p[2].replace("_", "-"), signed(p[1])]),
         marker: { size: 7, color, opacity: 0.62, line: { width: 1, color: css("--surface") } },
-        hovertemplate: "%{customdata}: %{x:.1f}% vacant → %{y:+.1f}% rent<extra>%{fullData.name}</extra>",
+        hovertemplate: "%{customdata[0]}: %{x:.1f}% vacant → %{customdata[1]}% rent<extra>%{fullData.name}</extra>",
       });
       const r = pearson(pairs.map(p => [p[0], p[1]]));
       if (r != null) rs.push(label(g) + " r = " + r.toFixed(2));
@@ -986,15 +988,16 @@
     const rest = pts.filter(p => !picked.has(p.g.i));
     const hits = pts.filter(p => picked.has(p.g.i));
     const colorOf = g => css(SERIES[state.picked.indexOf(g.i)] || "--s1");
-    const suffix = state.xmeasure === "yoy" ? "%{y:+.1f}% rent" : "%{y:$,.0f}";
-    const hover = "<b>%{customdata}</b><br>%{x:.2f}% vacant · " + suffix + "<extra></extra>";
+    // customdata[1] carries the signed growth: see the note in renderScatter
+    const suffix = state.xmeasure === "yoy" ? "%{customdata[1]}% rent" : "%{y:$,.0f}";
+    const hover = "<b>%{customdata[0]}</b><br>%{x:.1f}% vacant · " + suffix + "<extra></extra>";
     const size = p => p.g.p ? Math.max(6, Math.min(30, 5 + Math.sqrt(p.g.p) / 260)) : 7;
 
     return [
       {
         type: "scatter", mode: "markers", showlegend: false,
         x: rest.map(p => p.x), y: rest.map(p => p.y),
-        customdata: rest.map(p => label(p.g)),
+        customdata: rest.map(p => [label(p.g), signed(p.y)]),
         marker: {
           size: rest.map(size), color: css("--accent"), opacity: 0.34,
           line: { width: 1, color: css("--surface") },
@@ -1006,7 +1009,7 @@
         x: hits.map(p => p.x), y: hits.map(p => p.y),
         text: hits.map(p => p.g.n), textposition: "top center",
         textfont: { size: 11, color: css("--ink") },
-        customdata: hits.map(p => label(p.g)),
+        customdata: hits.map(p => [label(p.g), signed(p.y)]),
         marker: {
           size: hits.map(p => size(p) + 3), color: hits.map(p => colorOf(p.g)),
           line: { width: 2, color: css("--surface") },
