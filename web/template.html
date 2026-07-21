@@ -590,7 +590,7 @@
     return state.picked.map((idx, k) => {
       const g = geos[idx];
       return {
-        type: "scattergl", mode: "lines", name: label(g),
+        type: "scatter", mode: "lines", name: label(g),
         x: dates, y: getter(g),
         line: { width: 2, color: css(SERIES[k]), shape: "linear" },
         hovertemplate: hover,
@@ -619,7 +619,7 @@
       const g = geos[idx], pairs = lagPairs(g), color = css(SERIES[k]);
       if (!pairs.length) return;
       traces.push({
-        type: "scattergl", mode: "markers", name: label(g),
+        type: "scatter", mode: "markers", name: label(g),
         x: pairs.map(p => p[0]), y: pairs.map(p => p[1]),
         customdata: pairs.map(p => p[2].replace("_", "-")),
         marker: { size: 7, color, opacity: 0.62, line: { width: 1, color: css("--surface") } },
@@ -639,7 +639,7 @@
         const b = num / den, a = my - b * mx;
         const xs = [Math.min(...pairs.map(p => p[0])), Math.max(...pairs.map(p => p[0]))];
         traces.push({
-          type: "scattergl", mode: "lines", showlegend: false, hoverinfo: "skip",
+          type: "scatter", mode: "lines", showlegend: false, hoverinfo: "skip",
           x: xs, y: xs.map(x => a + b * x),
           line: { width: 2, color, dash: "dot" },
         });
@@ -696,7 +696,7 @@
 
     return [
       {
-        type: "scattergl", mode: "markers", name: state.xgeo + "s", showlegend: false,
+        type: "scatter", mode: "markers", name: state.xgeo + "s", showlegend: false,
         x: rest.map(p => p.x), y: rest.map(p => p.y),
         customdata: rest.map(p => label(p.g)),
         marker: {
@@ -706,7 +706,7 @@
         hovertemplate: hover,
       },
       {
-        type: "scattergl", mode: "markers+text", name: "selected", showlegend: false,
+        type: "scatter", mode: "markers+text", name: "selected", showlegend: false,
         x: hits.map(p => p.x), y: hits.map(p => p.y),
         text: hits.map(p => p.g.n), textposition: "top center",
         textfont: { size: 11, color: css("--ink") },
