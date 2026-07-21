@@ -12,3 +12,6 @@ wheels/
 # project
 data/raw/
 site/
+data/acs/
+.env
+census_api_key.txt

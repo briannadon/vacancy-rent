@@ -36,6 +36,33 @@ so it opens straight off the filesystem — no server, no network.
 Apartment List rotates its Contentful asset URLs every month, so the build scrapes
 the download page for the current links rather than hardcoding them.
 
+## The ACS panel (2005–2024)
+
+Apartment List starts in 2017. For a longer history, `uv run fetch-acs` pulls the
+Census ACS 1-year tables, where rent and vacancy come out of the same survey:
+
+| | |
+|---|---|
+| `B25064_001` | median gross rent |
+| `B25031_003/004` | median gross rent, 1br / 2br (2015 on only) |
+| `B25003_003` | renter-occupied units |
+| `B25004_002` | vacant units, for rent |
+
+Rental vacancy rate is `B25004_002 / (B25003_003 + B25004_002)`, the same
+construction the Housing Vacancy Survey uses. Output: `web/acs.json`, 1,577
+geographies (512 metros, 721 counties, 292 cities, 52 states) over 19 years.
+
+Needs a free Census API key in `.env` as `CENSUS_API_KEY=…`
+([signup](https://api.census.gov/data/key_signup.html); the key has to be
+activated from the confirmation email before it works). Raw responses are cached
+under `data/acs/`, so re-runs cost nothing.
+
+What this series is *not*: gross rent includes utilities and covers sitting
+tenants, so it moves far more slowly than an asking rent and sits below it in
+level. No 2020 release. 1-year tables only cover geographies above 65,000 people.
+Metro boundaries were redrawn in 2013 and again in 2023, so a long series for one
+CBSA code is not always the same set of counties; names shown are the most recent.
+
 ## Layout
 
 ```
