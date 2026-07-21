@@ -129,6 +129,31 @@
     .controls { grid-template-columns: 1fr; }
   }
 
+  /* ── phones ───────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    body { padding: 18px 12px 48px; }
+    .wrap { gap: 14px; }
+    .controls { gap: 14px; padding: 14px; }
+    .panel { padding: 12px 4px 4px 4px; }
+    .panel h2, .panel .sub, .panelctl { margin-left: 6px; padding-left: 0; }
+
+    /* iOS zooms the viewport when a field under 16px takes focus, which
+       leaves the page scrolled sideways for the rest of the session */
+    input[type="search"], select { font-size: 16px; padding: 9px 11px; }
+
+    /* touch targets */
+    .results li { padding: 10px 10px; font-size: 15px; }
+    .results { max-height: 46vh; }
+    .chip { font-size: 14px; padding: 6px 6px 6px 11px; }
+    .chip button { padding: 4px 8px; font-size: 17px; }
+    .panelctl select, .panelctl button { min-height: 38px; }
+    input[type="range"] { height: 32px; }
+
+    .tiles { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+    .tile { padding: 11px 12px 12px; }
+    .tile .v { font-size: 22px; }
+  }
+
   .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
   .field > label { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: .01em; }
 
@@ -703,14 +728,18 @@
   }
 
   /* ── plot scaffolding ───────────────────────────────── */
+  const isNarrow = () => window.matchMedia("(max-width: 640px)").matches;
+
   function base(height, extra) {
-    const font = { family: "system-ui, -apple-system, Segoe UI, sans-serif", size: 12, color: css("--ink-2") };
+    const narrow = isNarrow();
+    const font = { family: "system-ui, -apple-system, Segoe UI, sans-serif",
+      size: narrow ? 13 : 12, color: css("--ink-2") };
     return Object.assign({
-      height,
+      height: narrow ? Math.round(height * 0.92) + 20 : height,
       font,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
-      margin: { l: 68, r: 24, t: 12, b: 40 },
+      margin: narrow ? { l: 46, r: 10, t: 10, b: 36 } : { l: 68, r: 24, t: 12, b: 40 },
       hoverlabel: {
         bgcolor: css("--surface"), bordercolor: css("--line"),
         font: { color: css("--ink"), family: font.family, size: 12 },
@@ -720,16 +749,20 @@
       showlegend: false,
       xaxis: {
         gridcolor: css("--grid"), linecolor: css("--line"), zeroline: false,
-        tickfont: { color: css("--muted"), size: 11 },
+        tickfont: { color: css("--muted"), size: narrow ? 12 : 11 },
+        nticks: narrow ? 5 : undefined,
       },
       yaxis: {
         gridcolor: css("--grid"), linecolor: css("--line"), zeroline: false,
-        tickfont: { color: css("--muted"), size: 11 },
+        tickfont: { color: css("--muted"), size: narrow ? 12 : 11 },
+        nticks: narrow ? 5 : undefined,
       },
     }, extra);
   }
 
   const CONFIG = { responsive: true, displaylogo: false, scrollZoom: false,
+    // the modebar overlaps the plot at phone widths and is unusable by touch
+    displayModeBar: !isNarrow(),
     modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d", "toggleSpikelines"] };
 
   const DASH = { solid: "solid", dash: "6px,4px", dot: "2px,4px" };
@@ -1083,6 +1116,13 @@
   render();
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderChips(); render(); });
+
+  // plot margins, tick density and the modebar all switch at the narrow
+  // breakpoint, so a rotation or window resize has to redraw, not just reflow
+  matchMedia("(max-width: 640px)").addEventListener("change", () => {
+    CONFIG.displayModeBar = !isNarrow();
+    render();
+  });
   new MutationObserver(() => { renderChips(); render(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 </script>
