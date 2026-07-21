@@ -906,7 +906,7 @@
         x: pairs.map(p => p[0]), y: pairs.map(p => p[1]),
         customdata: pairs.map(p => p[2].replace("_", "-")),
         marker: { size: 7, color, opacity: 0.62, line: { width: 1, color: css("--surface") } },
-        hovertemplate: "%{customdata}: %{x:.2f}% vacant → %{y:+.1f}% rent<extra>%{fullData.name}</extra>",
+        hovertemplate: "%{customdata}: %{x:.1f}% vacant → %{y:+.1f}% rent<extra>%{fullData.name}</extra>",
       });
       const r = pearson(pairs.map(p => [p[0], p[1]]));
       if (r != null) rs.push(label(g) + " r = " + r.toFixed(2));
@@ -931,10 +931,14 @@
     draw("scatterPlot", traces, base(360, {
       hovermode: "closest",
       margin: isNarrow() ? { l: 58, r: 10, t: 8, b: 50 } : { l: 68, r: 24, t: 8, b: 52 },
-      xaxis: Object.assign(base(0).xaxis, { title: { text: "Vacancy rate", standoff: 8 }, ticksuffix: "%" }),
+      xaxis: Object.assign(base(0).xaxis, {
+        title: { text: "Vacancy rate", standoff: 8 },
+        ticksuffix: "%", tickformat: ".1f",
+      }),
       yaxis: Object.assign(base(0).yaxis, {
         title: { text: `Rent growth ${lagStep()} ${unit} later`, standoff: 8 },
-        ticksuffix: "%", zeroline: true, zerolinecolor: css("--line"), zerolinewidth: 1,
+        ticksuffix: "%", tickformat: ".1f",
+        zeroline: true, zerolinecolor: css("--line"), zerolinewidth: 1,
       }),
     }), CONFIG);
 
