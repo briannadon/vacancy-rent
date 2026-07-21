@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vacancy &amp; Rent — US rental markets</title>
+<script src="./plotly.min.js"></script>
+
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f2f4f7;
+    --surface: #ffffff;
+    --surface-2: #f7f9fb;
+    --ink: #0e1116;
+    --ink-2: #4a5568;
+    --muted: #77839a;
+    --line: #dfe4ec;
+    --grid: #e9edf3;
+    --accent: #2a78d6;
+    --s1: #2a78d6;
+    --s2: #008300;
+    --s3: #e87ba4;
+    --s4: #eda100;
+    --up: #006300;
+    --down: #c0362f;
+    --shadow: 0 1px 2px rgba(14, 17, 22, .05), 0 8px 24px -16px rgba(14, 17, 22, .25);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #0b0d10;
+      --surface: #14171c;
+      --surface-2: #1a1e24;
+      --ink: #eef1f6;
+      --ink-2: #b6c0cf;
+      --muted: #8b95a6;
+      --line: #262b33;
+      --grid: #22272e;
+      --accent: #3987e5;
+      --s1: #3987e5;
+      --s2: #008300;
+      --s3: #d55181;
+      --s4: #c98500;
+      --up: #0ca30c;
+      --down: #e66767;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px -20px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #0b0d10;
+    --surface: #14171c;
+    --surface-2: #1a1e24;
+    --ink: #eef1f6;
+    --ink-2: #b6c0cf;
+    --muted: #8b95a6;
+    --line: #262b33;
+    --grid: #22272e;
+    --accent: #3987e5;
+    --s1: #3987e5;
+    --s2: #008300;
+    --s3: #d55181;
+    --s4: #c98500;
+    --up: #0ca30c;
+    --down: #e66767;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px -20px rgba(0, 0, 0, .8);
+  }
+
+  body {
+    background: var(--plane);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 28px 20px 64px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: clamp(24px, 3.4vw, 34px);
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    margin: 6px 0 8px;
+    text-wrap: balance;
+  }
+
+  header p {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-2);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── controls ─────────────────────────────────────────── */
+  .controls {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(150px, 1fr));
+    gap: 18px;
+    padding: 16px 18px;
+    align-items: start;
+  }
+
+  @media (max-width: 760px) {
+    .controls { grid-template-columns: 1fr; }
+  }
+
+  .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .field > label { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: .01em; }
+
+  input[type="search"], select {
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  input[type="search"]:focus-visible,
+  select:focus-visible,
+  button:focus-visible,
+  input[type="range"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .combo { position: relative; }
+
+  .results {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    max-height: 264px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 4px;
+    margin: 0;
+    list-style: none;
+  }
+
+  .results[hidden] { display: none; }
+
+  .results li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .results li[aria-selected="true"], .results li:hover { background: var(--surface-2); }
+  .results .kind {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    padding: 4px 6px 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+
+  .chip .swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .chip button {
+    border: 0; background: none; cursor: pointer; color: var(--muted);
+    font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+  }
+  .chip button:hover { color: var(--ink); background: var(--line); }
+
+  .lagrow { display: flex; align-items: center; gap: 10px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 0; }
+  .lagval {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px; color: var(--ink-2); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+  /* ── stat tiles ───────────────────────────────────────── */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 12px;
+  }
+
+  .tile { padding: 13px 15px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .tile .k {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  }
+  .tile .v { font-size: 25px; letter-spacing: -.02em; line-height: 1.2; }
+  .tile .d { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .pos { color: var(--up); }
+  .neg { color: var(--down); }
+
+  /* ── charts ───────────────────────────────────────────── */
+  .panel { padding: 14px 8px 6px 8px; }
+  .panelhead {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    align-items: flex-start; justify-content: space-between;
+  }
+  .panelctl { display: flex; gap: 8px; padding: 0 10px 6px; flex-wrap: wrap; }
+  .panelctl select { width: auto; font-size: 13px; padding: 5px 8px; }
+
+  .panel h2 {
+    font-size: 14px; margin: 0 0 2px 10px; letter-spacing: -.01em;
+  }
+  .panel .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 6px 10px; max-width: 70ch; }
+  .plot { width: 100%; }
+
+  footer { color: var(--muted); font-size: 12.5px; }
+  footer a { color: var(--accent); }
+  .sr {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Apartment List · Jan 2017 – present</div>
+    <h1>Vacancy and rent, in the same place</h1>
+    <p>
+      Vacancy rates and rents get published separately, so the two are rarely read against each
+      other. Pick up to four markets to see how much slack each one carries and what rents did
+      about it.
+    </p>
+  </header>
+
+  <section class="card controls" aria-label="Controls">
+    <div class="field">
+      <label for="q">Markets <span class="hint" style="font-weight:400">(up to 4)</span></label>
+      <div class="combo">
+        <input id="q" type="search" placeholder="Search a metro, city, county or state…"
+               autocomplete="off" role="combobox" aria-expanded="false"
+               aria-controls="results" aria-autocomplete="list">
+        <ul id="results" class="results" role="listbox" hidden></ul>
+      </div>
+      <div id="chips" class="chips"></div>
+    </div>
+
+    <div class="field">
+      <label for="bed">Unit size</label>
+      <select id="bed">
+        <option value="overall">All units</option>
+        <option value="1br">1 bedroom</option>
+        <option value="2br">2 bedroom</option>
+      </select>
+      <p class="hint">Holding unit size fixed is the closest thing to a per-square-foot control this data allows.</p>
+    </div>
+
+    <div class="field">
+      <label for="lag">Rent response lag</label>
+      <div class="lagrow">
+        <input id="lag" type="range" min="0" max="18" step="1" value="6"
+               aria-describedby="lagval">
+        <span id="lagval" class="lagval">6 mo</span>
+      </div>
+      <p class="hint">Scatter compares vacancy in one month against rent growth this many months later.</p>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Latest figures"></section>
+
+  <section class="card panel">
+    <h2>Median asking rent</h2>
+    <p class="sub" id="rentsub">New leases, all unit sizes. Drag to zoom, double-click to reset.</p>
+    <div id="rentPlot" class="plot"></div>
+  </section>
+
+  <section class="card panel">
+    <h2>Vacancy index</h2>
+    <p class="sub">Share of units sitting empty. Same time axis as the rent chart above.</p>
+    <div id="vacPlot" class="plot"></div>
+  </section>
+
+  <section class="card panel">
+    <div class="panelhead">
+      <div>
+        <h2>Every market at once</h2>
+        <p class="sub" id="xsub"></p>
+      </div>
+      <div class="panelctl">
+        <label class="sr" for="xgeo">Geography</label>
+        <select id="xgeo">
+          <option value="Metro">Metros</option>
+          <option value="City">Cities</option>
+          <option value="County">Counties</option>
+          <option value="State">States</option>
+        </select>
+        <label class="sr" for="xmeasure">Vertical axis</label>
+        <select id="xmeasure">
+          <option value="level">Rent level</option>
+          <option value="yoy">Rent growth, year over year</option>
+        </select>
+      </div>
+    </div>
+    <div id="xsPlot" class="plot"></div>
+  </section>
+
+  <section class="card panel">
+    <h2>Does slack move rent?</h2>
+    <p class="sub" id="scattersub"></p>
+    <div id="scatterPlot" class="plot"></div>
+  </section>
+
+  <footer>
+    Data: <a href="https://www.apartmentlist.com/research/category/data-rent-estimates">Apartment
+    List rent estimates and vacancy index</a>, monthly since January 2017, rebuilt by
+    <code>uv run build-data</code>. The vacancy index counts vacant units among properties listing
+    on Apartment List, so its level runs above Census estimates; the movement is what to read.
+  </footer>
+</div>
+
+<script>
+  const DATA = "__DATA__";
+  const MAX = 4;
+  const SERIES = ["--s1", "--s2", "--s3", "--s4"];
+
+  const months = DATA.months;
+  const dates = months.map(m => m.slice(0, 4) + "-" + m.slice(5) + "-01");
+  const geos = DATA.geos;
+  geos.forEach((g, i) => { g.i = i; });
+
+  const state = {
+    picked: [geos.findIndex(g => g.t === "National")].filter(i => i >= 0),
+    bed: "overall",
+    lag: 6,
+    xgeo: "Metro",
+    xmeasure: "level",
+    xframe: null,
+  };
+  if (!state.picked.length) state.picked = [0];
+
+  const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const fmtMoney = v => v == null ? "—" : "$" + Math.round(v).toLocaleString();
+  const fmtPct = (v, d = 1) => v == null ? "—" : v.toFixed(d) + "%";
+  const signed = (v, d = 1) => (v > 0 ? "+" : "") + v.toFixed(d);
+  const label = g => g.n + (g.t === "City" || g.t === "County" ? ", " + (g.s || "") : "");
+
+  /* ── series maths ───────────────────────────────────── */
+  const rentSeries = g => (g.r[state.bed] || g.r.overall).map(v => v == null ? null : v);
+  const vacSeries = g => g.v.map(v => v == null ? null : v / 100);
+
+  function yoySeries(g) {
+    const r = rentSeries(g);
+    return r.map((v, i) => (i < 12 || v == null || r[i - 12] == null) ? null : (v / r[i - 12] - 1) * 100);
+  }
+
+  function pearson(pairs) {
+    const n = pairs.length;
+    if (n < 8) return null;
+    let sx = 0, sy = 0;
+    for (const [x, y] of pairs) { sx += x; sy += y; }
+    const mx = sx / n, my = sy / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (const [x, y] of pairs) {
+      const dx = x - mx, dy = y - my;
+      sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+    }
+    return (sxx && syy) ? sxy / Math.sqrt(sxx * syy) : null;
+  }
+
+  function lagPairs(g) {
+    const v = vacSeries(g), y = yoySeries(g), out = [];
+    for (let i = 0; i + state.lag < v.length; i++) {
+      const a = v[i], b = y[i + state.lag];
+      if (a != null && b != null) out.push([a, b, months[i]]);
+    }
+    return out;
+  }
+
+  function lastDefined(arr) {
+    for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return { v: arr[i], i };
+    return { v: null, i: -1 };
+  }
+
+  /* ── market picker ──────────────────────────────────── */
+  const q = document.getElementById("q");
+  const results = document.getElementById("results");
+  const chips = document.getElementById("chips");
+  let cursor = -1, matches = [];
+
+  function search(term) {
+    const t = term.trim().toLowerCase();
+    if (!t) return [];
+    const out = [];
+    for (const g of geos) {
+      if (state.picked.includes(g.i)) continue;
+      const hay = label(g).toLowerCase();
+      const at = hay.indexOf(t);
+      if (at >= 0) out.push([at === 0 ? 0 : 1, -g.p, g]);
+      if (out.length > 400) break;
+    }
+    out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    return out.slice(0, 40).map(x => x[2]);
+  }
+
+  function renderResults() {
+    results.innerHTML = "";
+    if (!matches.length) { results.hidden = true; q.setAttribute("aria-expanded", "false"); return; }
+    matches.forEach((g, k) => {
+      const li = document.createElement("li");
+      li.role = "option";
+      li.setAttribute("aria-selected", k === cursor);
+      li.innerHTML = "<span></span><span class='kind'></span>";
+      li.firstChild.textContent = label(g);
+      li.lastChild.textContent = g.t;
+      li.addEventListener("mousedown", e => { e.preventDefault(); pick(g.i); });
+      results.appendChild(li);
+    });
+    results.hidden = false;
+    q.setAttribute("aria-expanded", "true");
+  }
+
+  function pick(i) {
+    if (state.picked.includes(i)) return;
+    if (state.picked.length >= MAX) state.picked.shift();
+    state.picked.push(i);
+    q.value = ""; matches = []; cursor = -1;
+    renderResults(); renderChips(); render();
+  }
+
+  function unpick(i) {
+    if (state.picked.length === 1) return;
+    state.picked = state.picked.filter(x => x !== i);
+    renderChips(); render();
+  }
+
+  function renderChips() {
+    chips.innerHTML = "";
+    state.picked.forEach((idx, k) => {
+      const g = geos[idx];
+      const el = document.createElement("span");
+      el.className = "chip";
+      el.innerHTML = "<span class='swatch'></span><span></span>" +
+        "<button type='button' aria-label='Remove'>×</button>";
+      el.children[0].style.background = css(SERIES[k]);
+      el.children[1].textContent = label(g);
+      el.children[2].addEventListener("click", () => unpick(idx));
+      if (state.picked.length === 1) el.children[2].disabled = true;
+      chips.appendChild(el);
+    });
+  }
+
+  q.addEventListener("input", () => { matches = search(q.value); cursor = -1; renderResults(); });
+  q.addEventListener("focus", () => { if (q.value) { matches = search(q.value); renderResults(); } });
+  q.addEventListener("blur", () => setTimeout(() => { results.hidden = true; }, 120));
+  q.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!matches.length) return;
+      cursor = (cursor + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length;
+      renderResults();
+      results.children[cursor].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" && cursor >= 0) {
+      e.preventDefault(); pick(matches[cursor].i);
+    } else if (e.key === "Escape") {
+      results.hidden = true;
+    }
+  });
+
+  document.getElementById("bed").addEventListener("change", e => {
+    state.bed = e.target.value;
+    document.getElementById("rentsub").textContent =
+      "New leases, " + e.target.selectedOptions[0].text.toLowerCase() +
+      ". Drag to zoom, double-click to reset.";
+    render();
+  });
+
+  document.getElementById("xgeo").addEventListener("change", e => {
+    state.xgeo = e.target.value; renderCrossSection();
+  });
+  document.getElementById("xmeasure").addEventListener("change", e => {
+    state.xmeasure = e.target.value; renderCrossSection();
+  });
+
+  const lag = document.getElementById("lag");
+  lag.addEventListener("input", e => {
+    state.lag = +e.target.value;
+    document.getElementById("lagval").textContent = state.lag + " mo";
+    render();
+  });
+
+  /* ── tiles ──────────────────────────────────────────── */
+  function renderTiles() {
+    const g = geos[state.picked[0]];
+    const r = rentSeries(g), v = vacSeries(g), y = yoySeries(g);
+    const lr = lastDefined(r), lv = lastDefined(v), ly = lastDefined(y);
+    const vYear = lv.i >= 12 ? v[lv.i - 12] : null;
+    const dv = (lv.v != null && vYear != null) ? lv.v - vYear : null;
+    const r_ = pearson(lagPairs(g).map(p => [p[0], p[1]]));
+    const asOf = lr.i >= 0 ? new Date(dates[lr.i]).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
+
+    const tiles = [
+      ["Median rent", fmtMoney(lr.v), label(g) + " · " + asOf, ""],
+      ["Rent, year over year", ly.v == null ? "—" : signed(ly.v) + "%", "vs. same month last year",
+        ly.v == null ? "" : (ly.v >= 0 ? "pos" : "neg")],
+      ["Vacancy", fmtPct(lv.v), "share of units empty", ""],
+      ["Vacancy vs. last year", dv == null ? "—" : signed(dv) + " pts",
+        dv == null ? "" : (dv > 0 ? "more slack" : "tighter"), ""],
+      ["Correlation, " + state.lag + " mo lag", r_ == null ? "—" : r_.toFixed(2),
+        "vacancy vs. later rent growth", ""],
+    ];
+
+    document.getElementById("tiles").innerHTML = tiles.map(([k, val, d, cls]) =>
+      `<div class="card tile"><span class="k">${k}</span>` +
+      `<span class="v ${cls}">${val}</span><span class="d">${d}</span></div>`).join("");
+  }
+
+  /* ── plots ──────────────────────────────────────────── */
+  function base(height, extra) {
+    const font = { family: "system-ui, -apple-system, Segoe UI, sans-serif", size: 12, color: css("--ink-2") };
+    return Object.assign({
+      height,
+      font,
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      margin: { l: 62, r: 24, t: 8, b: 40 },
+      hoverlabel: {
+        bgcolor: css("--surface"), bordercolor: css("--line"),
+        font: { color: css("--ink"), family: font.family, size: 12 },
+      },
+      showlegend: state.picked.length > 1,
+      legend: { orientation: "h", y: 1.16, x: 0, font: { size: 12 } },
+      xaxis: {
+        gridcolor: css("--grid"), linecolor: css("--line"), zeroline: false,
+        tickfont: { color: css("--muted"), size: 11 },
+      },
+      yaxis: {
+        gridcolor: css("--grid"), linecolor: css("--line"), zeroline: false,
+        tickfont: { color: css("--muted"), size: 11 },
+      },
+    }, extra);
+  }
+
+  const CONFIG = { responsive: true, displaylogo: false, scrollZoom: false,
+    modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d", "toggleSpikelines"] };
+
+  function lineTraces(getter, hover) {
+    return state.picked.map((idx, k) => {
+      const g = geos[idx];
+      return {
+        type: "scattergl", mode: "lines", name: label(g),
+        x: dates, y: getter(g),
+        line: { width: 2, color: css(SERIES[k]), shape: "linear" },
+        hovertemplate: hover,
+        connectgaps: false,
+      };
+    });
+  }
+
+  function renderPlots() {
+    Plotly.react("rentPlot", lineTraces(rentSeries, "%{y:$,.0f}<extra>%{fullData.name}</extra>"),
+      base(280, {
+        hovermode: "x unified",
+        yaxis: Object.assign(base(0).yaxis, { tickprefix: "$", separatethousands: true }),
+      }), CONFIG);
+
+    Plotly.react("vacPlot", lineTraces(vacSeries, "%{y:.2f}%<extra>%{fullData.name}</extra>"),
+      base(240, {
+        hovermode: "x unified",
+        yaxis: Object.assign(base(0).yaxis, { ticksuffix: "%" }),
+      }), CONFIG);
+
+    // scatter: vacancy(t) vs rent growth(t + lag)
+    const traces = [];
+    const rs = [];
+    state.picked.forEach((idx, k) => {
+      const g = geos[idx], pairs = lagPairs(g), color = css(SERIES[k]);
+      if (!pairs.length) return;
+      traces.push({
+        type: "scattergl", mode: "markers", name: label(g),
+        x: pairs.map(p => p[0]), y: pairs.map(p => p[1]),
+        customdata: pairs.map(p => p[2].replace("_", "-")),
+        marker: { size: 7, color, opacity: 0.62, line: { width: 1, color: css("--surface") } },
+        hovertemplate: "%{customdata}: %{x:.2f}% vacant → %{y:+.1f}% rent" +
+          "<extra>%{fullData.name}</extra>",
+      });
+      const r_ = pearson(pairs.map(p => [p[0], p[1]]));
+      if (r_ != null) rs.push(label(g) + " r = " + r_.toFixed(2));
+
+      // least-squares fit
+      const n = pairs.length;
+      const mx = pairs.reduce((s, p) => s + p[0], 0) / n;
+      const my = pairs.reduce((s, p) => s + p[1], 0) / n;
+      let num = 0, den = 0;
+      for (const p of pairs) { num += (p[0] - mx) * (p[1] - my); den += (p[0] - mx) ** 2; }
+      if (den) {
+        const b = num / den, a = my - b * mx;
+        const xs = [Math.min(...pairs.map(p => p[0])), Math.max(...pairs.map(p => p[0]))];
+        traces.push({
+          type: "scattergl", mode: "lines", showlegend: false, hoverinfo: "skip",
+          x: xs, y: xs.map(x => a + b * x),
+          line: { width: 2, color, dash: "dot" },
+        });
+      }
+    });
+
+    Plotly.react("scatterPlot", traces, base(360, {
+      hovermode: "closest",
+      xaxis: Object.assign(base(0).xaxis, { title: { text: "Vacancy rate", standoff: 8 }, ticksuffix: "%" }),
+      yaxis: Object.assign(base(0).yaxis, {
+        title: { text: "Rent growth " + state.lag + " months later", standoff: 8 },
+        ticksuffix: "%", zeroline: true, zerolinecolor: css("--line"), zerolinewidth: 1,
+      }),
+      margin: { l: 68, r: 24, t: 8, b: 52 },
+    }), CONFIG);
+
+    document.getElementById("scattersub").textContent =
+      "Each dot is one month. A downward slope means slack came before slower rent growth. " +
+      (rs.length ? rs.join(" · ") : "");
+  }
+
+  /* ── cross-section: every market, animated by year ──── */
+  const monthName = i => new Date(dates[i]).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+
+  function snapshotIndices() {
+    const out = [];
+    for (let i = months.length - 1; i >= 12; i -= 12) out.push(i);
+    return out.reverse();
+  }
+
+  function snapshot(i) {
+    const pts = [];
+    for (const g of geos) {
+      if (g.t !== state.xgeo) continue;
+      const r = rentSeries(g), v = vacSeries(g);
+      const y = state.xmeasure === "yoy"
+        ? (r[i] != null && r[i - 12] != null ? (r[i] / r[i - 12] - 1) * 100 : null)
+        : r[i];
+      if (v[i] == null || y == null) continue;
+      pts.push({ g, x: v[i], y });
+    }
+    return pts;
+  }
+
+  function xsTraces(i) {
+    const pts = snapshot(i);
+    const picked = new Set(state.picked);
+    const rest = pts.filter(p => !picked.has(p.g.i));
+    const hits = pts.filter(p => picked.has(p.g.i));
+    const colorOf = g => css(SERIES[state.picked.indexOf(g.i)] || "--s1");
+    const suffix = state.xmeasure === "yoy" ? "%{y:+.1f}% rent" : "%{y:$,.0f}";
+    const hover = "<b>%{customdata}</b><br>%{x:.2f}% vacant · " + suffix + "<extra></extra>";
+    const size = p => Math.max(6, Math.min(30, 5 + Math.sqrt(p.g.p) / 260));
+
+    return [
+      {
+        type: "scattergl", mode: "markers", name: state.xgeo + "s", showlegend: false,
+        x: rest.map(p => p.x), y: rest.map(p => p.y),
+        customdata: rest.map(p => label(p.g)),
+        marker: {
+          size: rest.map(size), color: css("--accent"), opacity: 0.34,
+          line: { width: 1, color: css("--surface") },
+        },
+        hovertemplate: hover,
+      },
+      {
+        type: "scattergl", mode: "markers+text", name: "selected", showlegend: false,
+        x: hits.map(p => p.x), y: hits.map(p => p.y),
+        text: hits.map(p => p.g.n), textposition: "top center",
+        textfont: { size: 11, color: css("--ink") },
+        customdata: hits.map(p => label(p.g)),
+        marker: {
+          size: hits.map(p => size(p) + 3), color: hits.map(p => colorOf(p.g)),
+          line: { width: 2, color: css("--surface") },
+        },
+        hovertemplate: hover,
+      },
+    ];
+  }
+
+  function xsAnnotations(i) {
+    const pts = snapshot(i);
+    const r_ = pearson(pts.map(p => [p.x, p.y]));
+    return [
+      {
+        text: monthName(i), x: 0.99, y: 0.04, xref: "paper", yref: "paper",
+        xanchor: "right", yanchor: "bottom", showarrow: false,
+        font: { size: 34, color: css("--grid"), family: "ui-monospace, SFMono-Regular, monospace" },
+      },
+      {
+        text: pts.length + " " + state.xgeo.toLowerCase() + "s · r = " + (r_ == null ? "—" : r_.toFixed(2)),
+        x: 0.99, y: 0.005, xref: "paper", yref: "paper",
+        xanchor: "right", yanchor: "bottom", showarrow: false,
+        font: { size: 12, color: css("--muted") },
+      },
+    ];
+  }
+
+  function renderCrossSection() {
+    const idx = snapshotIndices();
+    if (state.xframe == null || !idx.includes(state.xframe)) state.xframe = idx[idx.length - 1];
+    const cur = state.xframe;
+
+    // one shared range across all frames so the animation reads as movement
+    let xhi = 0, ylo = Infinity, yhi = -Infinity;
+    for (const i of idx) {
+      for (const p of snapshot(i)) {
+        xhi = Math.max(xhi, p.x); ylo = Math.min(ylo, p.y); yhi = Math.max(yhi, p.y);
+      }
+    }
+    const ypad = (yhi - ylo) * 0.08 || 1;
+
+    const yaxis = Object.assign(base(0).yaxis, {
+      range: [ylo - ypad, yhi + ypad],
+      title: {
+        text: state.xmeasure === "yoy" ? "Rent growth, year over year" : "Median rent",
+        standoff: 8,
+      },
+    }, state.xmeasure === "yoy"
+      ? { ticksuffix: "%", zeroline: true, zerolinecolor: css("--line"), zerolinewidth: 1 }
+      : { tickprefix: "$", separatethousands: true });
+
+    const layout = base(430, {
+      hovermode: "closest",
+      margin: { l: 88, r: 24, t: 8, b: 96 },
+      annotations: xsAnnotations(cur),
+      xaxis: Object.assign(base(0).xaxis, {
+        title: { text: "Vacancy rate", standoff: 8 },
+        ticksuffix: "%", range: [0, xhi * 1.04],
+      }),
+      yaxis,
+      updatemenus: [{
+        type: "buttons", showactive: false, x: 0, y: -0.28, xanchor: "left", yanchor: "top",
+        bgcolor: css("--surface-2"), bordercolor: css("--line"),
+        font: { color: css("--ink-2"), size: 12 },
+        buttons: [{
+          label: "▶  Play",
+          method: "animate",
+          args: [null, { frame: { duration: 900, redraw: true }, transition: { duration: 550 }, mode: "immediate" }],
+        }],
+      }],
+      sliders: [{
+        active: idx.indexOf(cur),
+        x: 0.1, len: 0.9, y: -0.28, xanchor: "left", yanchor: "top",
+        pad: { t: 4 },
+        currentvalue: { visible: false },
+        tickcolor: css("--line"),
+        font: { color: css("--muted"), size: 11 },
+        activebgcolor: css("--accent"),
+        bgcolor: css("--line"),
+        bordercolor: css("--line"),
+        steps: idx.map(i => ({
+          label: months[i].slice(0, 4),
+          method: "animate",
+          args: [["f" + i], { mode: "immediate", frame: { duration: 400, redraw: true }, transition: { duration: 300 } }],
+        })),
+      }],
+    });
+
+    const frames = idx.map(i => ({
+      name: "f" + i,
+      data: xsTraces(i),
+      layout: { annotations: xsAnnotations(i) },
+    }));
+
+    const el = document.getElementById("xsPlot");
+    Plotly.react(el, xsTraces(cur), layout, CONFIG).then(() => {
+      el.on("plotly_animated", () => {
+        const s = el.layout.sliders && el.layout.sliders[0];
+        if (s) state.xframe = idx[s.active] ?? state.xframe;
+      });
+      return Plotly.addFrames(el, frames);
+    });
+
+    document.getElementById("xsub").textContent =
+      "One dot per market, sized by population. Press play to watch the whole country move, " +
+      "or drag the year slider. Selected markets stay labelled.";
+  }
+
+  function render() { renderTiles(); renderPlots(); renderCrossSection(); }
+
+  renderChips();
+  render();
+
+  // repaint on theme change (OS preference or the viewer's toggle)
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderChips(); render(); });
+  new MutationObserver(() => { renderChips(); render(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>

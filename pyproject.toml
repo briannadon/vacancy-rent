@@ -1,0 +1,20 @@
+[project]
+name = "vacancy-rent"
+version = "0.1.0"
+description = "Joins Apartment List vacancy index and rent estimates into one browsable tool"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=3.0.3",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+build-data = "vacancy_rent.build_data:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vacancy_rent"]
